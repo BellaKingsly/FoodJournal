@@ -1,9 +1,35 @@
 /*
- * Date: 18/09/2026
+ * Date: 17/09/2026
  * Name: Penglei Fan (Bella)
- *
+ * 
+ *VS    ？？？what do u meaning Cole ?? Do you wanna go up against me???
+ *     What the fuck? why u always talk to me in here Cole? 
+ *     
+ * Cole??? I need help, that new guy deleted my fuck code a few months ago,
+ *  and he's still deleting it now... but never fuck mind 
+ * Just teach him how to avoid overwriting other people's code
+ * Clole???? How about I write it for him fuck?  I'm worried he'll replace my code again
+ * 
  * Date: 18/09/2026
  * Name: Cole Zinda
+
+Bella, don’t worry about the backend Java, 
+I’m here for you, and I’ll help you with it. 
+You’ve already done so much—why did you stay up so late writing all that code? 
+Please don’t push yourself too hard or stay up too late. 
+Take good care of yourself, and I hope everything
+ goes smoothly with your studies!
+ I might come see you during the holidays. Let’s grab a coffee if I do!
+
+ Thanks Cole, no worries, I finished fuck my work, and
+ welcome... we are good friends, 
+ I'd like to have coffee with you, toooooo, 
+ but I'm soooo fuck bad recently
+Coleeeeeeeeeeeeeeeeeeeeeeeeeeee, 
+I have write a bit more and create more fuck work for u, sometimes,
+I'm happy to do some fuck bad things lolllllllllllllllllllll
+Remember to delete it; the manager sometimes checks our Git lol
+
 
  *
  * File Path: backend/src/main/java/com/foodjournal/api/FoodJournalServer.java
@@ -569,7 +595,9 @@ public final class FoodJournalServer {
         seedProfile();
     }
 
-    /** Adds a profile field when opening a database created by an earlier version. */
+    /**
+     * Adds a profile field when opening a database created by an earlier version.
+     */
     private static void addProfileColumn(Statement statement, String definition) {
         try {
             statement.executeUpdate("ALTER TABLE profiles ADD COLUMN " + definition);
@@ -702,7 +730,10 @@ public final class FoodJournalServer {
         return authJson(createSession(user.id()), user);
     }
 
-    /** Validates the bearer token before a customer can access account data or payment. */
+    /**
+     * Validates the bearer token before a customer can access account data or
+     * payment.
+     */
     private static int authenticatedUserId(HttpExchange exchange) throws Exception {
         String authorization = exchange.getRequestHeaders().getFirst("Authorization");
         if (authorization == null || !authorization.startsWith("Bearer "))
@@ -739,7 +770,8 @@ public final class FoodJournalServer {
     private static boolean userExists(String field, String value) throws SQLException {
         String column = field.equals("email") ? "email" : "phone";
         try (Connection connection = database();
-                PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM users WHERE " + column + " = ?")) {
+                PreparedStatement statement = connection
+                        .prepareStatement("SELECT 1 FROM users WHERE " + column + " = ?")) {
             statement.setString(1, value);
             try (ResultSet result = statement.executeQuery()) {
                 return result.next();
@@ -811,9 +843,9 @@ public final class FoodJournalServer {
                 PreparedStatement statement = connection.prepareStatement("SELECT * FROM profiles WHERE user_id = ?")) {
             statement.setInt(1, userId);
             try (ResultSet result = statement.executeQuery()) {
-            if (!result.next())
-                return "{\"error\":\"Profile not found\"}";
-            return profileJson(result);
+                if (!result.next())
+                    return "{\"error\":\"Profile not found\"}";
+                return profileJson(result);
             }
         }
     }
@@ -840,8 +872,8 @@ public final class FoodJournalServer {
                 throw new SQLException("Enter a valid name, email address, and phone number");
             try (PreparedStatement user = connection.prepareStatement(
                     "UPDATE users SET name = ?, email = ?, phone = ? WHERE id = ?");
-                PreparedStatement statement = connection.prepareStatement(
-                        "UPDATE profiles SET name = ?, email = ?, phone = ?, city = ?, country = ?, address = ?, avatar = ? WHERE user_id = ?")) {
+                    PreparedStatement statement = connection.prepareStatement(
+                            "UPDATE profiles SET name = ?, email = ?, phone = ?, city = ?, country = ?, address = ?, avatar = ? WHERE user_id = ?")) {
                 user.setString(1, name);
                 user.setString(2, email);
                 user.setString(3, phone);
@@ -870,7 +902,8 @@ public final class FoodJournalServer {
                 if (result.next())
                     return;
             }
-            try (PreparedStatement user = connection.prepareStatement("SELECT name, email, phone FROM users WHERE id = ?")) {
+            try (PreparedStatement user = connection
+                    .prepareStatement("SELECT name, email, phone FROM users WHERE id = ?")) {
                 user.setInt(1, userId);
                 try (ResultSet result = user.executeQuery()) {
                     if (!result.next())

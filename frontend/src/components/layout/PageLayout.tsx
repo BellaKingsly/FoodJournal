@@ -52,7 +52,9 @@ function isNavigationActive(
   if (item.label === "Cart") return view.kind === "cart";
   if (item.label === "Profile")
     return view.route === "/screen/096-profileoverview";
-  return view.group === "profile";
+  return (
+    view.group === "profile" && view.route !== "/screen/096-profileoverview"
+  );
 }
 
 export function PageLayout({

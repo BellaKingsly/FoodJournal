@@ -1,6 +1,6 @@
 /*
  * Date: 06/09/2026
- * Name: Penglei Fan
+ * Name: Penglei Fan / Cole Zinda
  *
  * File Path: backend/src/main/java/com/foodjournal/api/MenuItem.java
  * Function: Represents a menu dish and converts it to an API JSON response

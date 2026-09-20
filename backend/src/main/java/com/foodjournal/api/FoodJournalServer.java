@@ -1,6 +1,6 @@
 /*
  * Date: 17/09/2026
- * Name: Penglei Fan (Bella)
+ * Name: Penglei Fan (Bella)  / Cole Zinda /
  * 
  *VS    ？？？what do u meaning Cole ?? Do you wanna go up against me???
  *     What the fuck? why u always talk to me in here Cole? 
@@ -45,6 +45,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -76,7 +77,8 @@ public final class FoodJournalServer {
     private static final String[][] API_ENDPOINTS = {
             { "GET", "/health", "Health check" },
             { "GET", "/config", "Application configuration" },
-            { "GET", "/menu", "Menu list" },
+            { "GET", "/menu", "Menu list with optional category, q, minRating, and sort filters" },
+            { "GET", "/menu/categories", "Menu categories" },
             { "GET", "/menu/{id}", "Menu item" },
             { "GET", "/recipes", "Recipe list" },
             { "GET", "/recipes/{id}", "Recipe detail" },
@@ -86,6 +88,9 @@ public final class FoodJournalServer {
             { "PATCH", "/orders/{id}", "Update order" },
             { "POST", "/auth/login", "Sign in" },
             { "POST", "/auth/register", "Register" },
+            { "GET", "/membership", "Membership details" },
+            { "POST", "/membership/checkout-session", "Create membership checkout" },
+            { "GET", "/membership/confirm", "Confirm membership payment" },
             { "GET", "/profile", "Profile" },
             { "PUT", "/profile", "Update profile" },
             { "GET", "/messages", "Messages" },
@@ -121,7 +126,7 @@ public final class FoodJournalServer {
                     "Hand-stretched crust, tomato sauce and mozzarella.",
                     18.00,
                     "Pizza",
-                    "/assets/food/pizza.svg",
+                    "/assets/food/generated/new-york-pizza.png",
                     4.8),
             new MenuItem(
                     2,
@@ -129,7 +134,7 @@ public final class FoodJournalServer {
                     "Double patty, cheddar, lettuce and house sauce.",
                     16.50,
                     "Burgers",
-                    "/assets/food/burger.svg",
+                    "/assets/food/generated/new-york-cheeseburger.png",
                     4.7),
             new MenuItem(
                     3,
@@ -137,7 +142,7 @@ public final class FoodJournalServer {
                     "Crispy wings with classic Buffalo sauce.",
                     14.00,
                     "Chicken",
-                    "/assets/food/wings.svg",
+                    "/assets/food/generated/buffalo-wings.png",
                     4.9),
             new MenuItem(
                     4,
@@ -145,7 +150,7 @@ public final class FoodJournalServer {
                     "Fluffy pancakes with maple syrup and butter.",
                     12.00,
                     "Breakfast",
-                    "/assets/food/pancakes.svg",
+                    "/assets/food/generated/buttermilk-pancakes.png",
                     4.6),
             new MenuItem(
                     5,
@@ -153,7 +158,7 @@ public final class FoodJournalServer {
                     "Creamy baked macaroni with a golden cheese crust.",
                     13.50,
                     "Comfort Food",
-                    "/assets/food/mac-cheese.svg",
+                    "/assets/food/generated/baked-mac-and-cheese.png",
                     4.8),
             new MenuItem(
                     6,
@@ -161,7 +166,7 @@ public final class FoodJournalServer {
                     "Grilled strip steak with seasonal vegetables.",
                     28.00,
                     "Steak",
-                    "/assets/food/steak.svg",
+                    "/assets/food/generated/new-york-strip-steak.png",
                     4.9),
             new MenuItem(
                     7,
@@ -169,7 +174,7 @@ public final class FoodJournalServer {
                     "Classic creamy cheesecake with a biscuit base.",
                     9.50,
                     "Dessert",
-                    "/assets/food/cheesecake.svg",
+                    "/assets/food/generated/new-york-cheesecake.png",
                     4.9),
             new MenuItem(
                     8,
@@ -177,7 +182,7 @@ public final class FoodJournalServer {
                     "Grilled chicken, greens, tomato and house dressing.",
                     15.00,
                     "Salads",
-                    "/assets/food/salad.svg",
+                    "/assets/food/generated/american-chicken-salad.png",
                     4.7));
 
     static {
@@ -248,7 +253,12 @@ public final class FoodJournalServer {
             // frontend/src/pages/chef.
             // Lists every available menu item.
             if (path.equals("/menu") && method.equals("GET")) {
-                sendJson(exchange, 200, menuJson());
+                sendJson(exchange, 200, menuJson(exchange.getRequestURI().getRawQuery()));
+                return;
+            }
+            // Lists the available categories for the menu filter control.
+            if (path.equals("/menu/categories") && method.equals("GET")) {
+                sendJson(exchange, 200, menuCategoriesJson());
                 return;
             }
             // Returns one menu item by its identifier.
@@ -300,6 +310,11 @@ public final class FoodJournalServer {
                 sendJson(exchange, 201, order.json());
                 return;
             }
+            // Creates a confirmed pay-at-restaurant order from the customer's cart.
+            if (path.equals("/orders/checkout") && method.equals("POST")) {
+                sendJson(exchange, 201, checkoutOrder(authenticatedUserId(exchange), readBody(exchange)));
+                return;
+            }
             // Returns one order by its identifier.
             if (path.startsWith("/orders/") && method.equals("GET")) {
                 String id = tail(path);
@@ -331,6 +346,26 @@ public final class FoodJournalServer {
             // Registers a customer with a unique email address and phone number.
             if (path.equals("/auth/register") && method.equals("POST")) {
                 sendJson(exchange, 201, registerUser(readBody(exchange)));
+                return;
+            }
+            // Returns the signed-in customer's membership tier and points.
+            if (path.equals("/membership") && method.equals("GET")) {
+                sendJson(exchange, 200, membershipJson(authenticatedUserId(exchange)));
+                return;
+            }
+            // Creates a secure checkout for the selected membership tier.
+            if (path.equals("/membership/checkout-session") && method.equals("POST")) {
+                int customerId = authenticatedUserId(exchange);
+                if (System.getenv("STRIPE_SECRET_KEY") == null || System.getenv("STRIPE_SECRET_KEY").isBlank()) {
+                    sendJson(exchange, 503, "{\"error\":\"STRIPE_SECRET_KEY is not configured\"}");
+                    return;
+                }
+                sendJson(exchange, 201, createMembershipCheckoutSession(customerId, readBody(exchange)));
+                return;
+            }
+            // Activates membership only after Stripe confirms the completed payment.
+            if (path.equals("/membership/confirm") && method.equals("GET")) {
+                confirmMembershipPayment(exchange);
                 return;
             }
             // Returns the current customer profile.
@@ -372,11 +407,13 @@ public final class FoodJournalServer {
                 String body = readBody(exchange);
                 int itemId = (int) jsonNumber(body, "itemId", 0);
                 int quantity = (int) jsonNumber(body, "quantity", 1);
+                String customization = jsonString(body, "customization", "");
+                double unitAdjustment = Math.max(0, jsonNumber(body, "unitAdjustment", 0));
                 if (itemId < 1 || findMenuItem(itemId) == null) {
                     sendJson(exchange, 400, "{\"error\":\"A valid itemId is required\"}");
                     return;
                 }
-                updateCartItem(itemId, quantity);
+                updateCartItem(itemId, quantity, customization, unitAdjustment);
                 sendJson(exchange, 200, cartJson());
                 return;
             }
@@ -563,10 +600,16 @@ public final class FoodJournalServer {
                             + "id TEXT PRIMARY KEY, customer_name TEXT NOT NULL, chef_name TEXT NOT NULL, "
                             + "status TEXT NOT NULL, total REAL NOT NULL, address TEXT NOT NULL, "
                             + "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)");
+            addOrderColumn(statement, "dining_option TEXT NOT NULL DEFAULT 'Pickup'");
+            addOrderColumn(statement, "pickup_time TEXT NOT NULL DEFAULT 'As soon as possible'");
+            addOrderColumn(statement, "payment_method TEXT NOT NULL DEFAULT 'Online'");
+            addOrderColumn(statement, "estimated_minutes INTEGER NOT NULL DEFAULT 20");
             statement.executeUpdate(
                     "CREATE TABLE IF NOT EXISTS cart_items ("
                             + "customer_id INTEGER NOT NULL, menu_item_id INTEGER NOT NULL, quantity INTEGER NOT NULL CHECK(quantity > 0), "
                             + "PRIMARY KEY(customer_id, menu_item_id), FOREIGN KEY(menu_item_id) REFERENCES menu_items(id))");
+            addCartColumn(statement, "customization TEXT NOT NULL DEFAULT ''");
+            addCartColumn(statement, "unit_adjustment REAL NOT NULL DEFAULT 0");
             statement.executeUpdate(
                     "CREATE TABLE IF NOT EXISTS payments ("
                             + "id TEXT PRIMARY KEY, order_id TEXT NOT NULL UNIQUE, payment_method TEXT NOT NULL, "
@@ -589,6 +632,11 @@ public final class FoodJournalServer {
                             + "token TEXT PRIMARY KEY, user_id INTEGER NOT NULL, expires_at TEXT NOT NULL, "
                             + "created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, "
                             + "FOREIGN KEY(user_id) REFERENCES users(id))");
+            statement.executeUpdate(
+                    "CREATE TABLE IF NOT EXISTS memberships ("
+                            + "user_id INTEGER PRIMARY KEY, tier TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 0, "
+                            + "joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                            + "FOREIGN KEY(user_id) REFERENCES users(id))");
         }
         seedMenu();
         seedOrders();
@@ -606,14 +654,39 @@ public final class FoodJournalServer {
         }
     }
 
+    /**
+     * Adds order fields without breaking an existing local development database.
+     */
+    private static void addOrderColumn(Statement statement, String definition) {
+        try {
+            statement.executeUpdate("ALTER TABLE orders ADD COLUMN " + definition);
+        } catch (SQLException ignored) {
+            // The column already exists in this local development database.
+        }
+    }
+
+    /**
+     * Adds customization fields to existing carts without losing their quantities.
+     */
+    private static void addCartColumn(Statement statement, String definition) {
+        try {
+            statement.executeUpdate("ALTER TABLE cart_items ADD COLUMN " + definition);
+        } catch (SQLException ignored) {
+            // The column already exists in this local development database.
+        }
+    }
+
     /** Adds the sample menu only when the menu table is empty. */
     private static void seedMenu() throws SQLException {
+        boolean hasMenuItems;
         try (Connection connection = database();
                 Statement statement = connection.createStatement();
                 ResultSet result = statement.executeQuery("SELECT COUNT(*) FROM menu_items")) {
-            if (result.next() && result.getInt(1) > 0) {
-                return;
-            }
+            hasMenuItems = result.next() && result.getInt(1) > 0;
+        }
+        if (hasMenuItems) {
+            updateSeedMenuImagePaths();
+            return;
         }
         try (Connection connection = database();
                 PreparedStatement statement = connection.prepareStatement(
@@ -626,6 +699,33 @@ public final class FoodJournalServer {
                 statement.setString(5, item.category);
                 statement.setString(6, item.image);
                 statement.setDouble(7, item.rating);
+                statement.addBatch();
+            }
+            statement.executeBatch();
+        }
+    }
+
+    /**
+     * Migrates only original seed-image paths without overwriting chef-uploaded
+     * images.
+     */
+    private static void updateSeedMenuImagePaths() throws SQLException {
+        String[][] replacements = {
+                { "/assets/food/generated/new-york-pizza.png", "/assets/food/pizza.svg" },
+                { "/assets/food/generated/new-york-cheeseburger.png", "/assets/food/burger.svg" },
+                { "/assets/food/generated/buffalo-wings.png", "/assets/food/wings.svg" },
+                { "/assets/food/generated/new-york-cheesecake.png", "/assets/food/cheesecake.svg" },
+                { "/assets/food/generated/buttermilk-pancakes.png", "/assets/food/pancakes.svg" },
+                { "/assets/food/generated/baked-mac-and-cheese.png", "/assets/food/mac-cheese.svg" },
+                { "/assets/food/generated/new-york-strip-steak.png", "/assets/food/steak.svg" },
+                { "/assets/food/generated/american-chicken-salad.png", "/assets/food/salad.svg" }
+        };
+        try (Connection connection = database();
+                PreparedStatement statement = connection
+                        .prepareStatement("UPDATE menu_items SET image = ? WHERE image = ?")) {
+            for (String[] replacement : replacements) {
+                statement.setString(1, replacement[0]);
+                statement.setString(2, replacement[1]);
                 statement.addBatch();
             }
             statement.executeBatch();
@@ -836,6 +936,40 @@ public final class FoodJournalServer {
         }
     }
 
+    // Membership persistence and rewards calculation.
+    /** Returns the current tier and rewards balance for one customer. */
+    private static String membershipJson(int userId) throws SQLException {
+        try (Connection connection = database();
+                PreparedStatement statement = connection.prepareStatement(
+                        "SELECT tier, points, joined_at FROM memberships WHERE user_id = ?")) {
+            statement.setInt(1, userId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next())
+                    return "{\"tier\":\"Guest\",\"points\":0,\"joinedAt\":null,\"active\":false}";
+                return "{\"tier\":" + quote(result.getString("tier"))
+                        + ",\"points\":" + result.getInt("points")
+                        + ",\"joinedAt\":" + quote(result.getString("joined_at")) + ",\"active\":true}";
+            }
+        }
+    }
+
+    /**
+     * Activates a paid membership tier and awards joining points to new members.
+     */
+    private static String saveMembership(int userId, String tier) throws SQLException, AuthRequestException {
+        if (!tier.equals("Basic") && !tier.equals("Gold") && !tier.equals("Platinum"))
+            throw new AuthRequestException(400, "Choose Basic, Gold, or Platinum membership");
+        try (Connection connection = database();
+                PreparedStatement statement = connection.prepareStatement(
+                        "INSERT INTO memberships (user_id, tier, points) VALUES (?, ?, 100) "
+                                + "ON CONFLICT(user_id) DO UPDATE SET tier = excluded.tier")) {
+            statement.setInt(1, userId);
+            statement.setString(2, tier);
+            statement.executeUpdate();
+        }
+        return membershipJson(userId);
+    }
+
     // Profile persistence and JSON serialization.
     private static String profileJson(int userId) throws SQLException {
         ensureUserProfile(userId);
@@ -925,21 +1059,70 @@ public final class FoodJournalServer {
         }
     }
 
-    // Menu persistence and JSON serialization.
+    // Serializes the menu and applies only validated, parameterized filter values.
     private static String menuJson() throws SQLException {
+        return menuJson(null);
+    }
+
+    /**
+     * Returns menu items filtered by category, search query, minimum rating, and
+     * sort order.
+     */
+    private static String menuJson(String query) throws SQLException {
+        String category = queryValue(query, "category");
+        String search = queryValue(query, "q").trim().toLowerCase();
+        double minimumRating = Math.max(0, Math.min(5, queryNumber(query, "minRating", 0)));
+        String sort = queryValue(query, "sort");
+        String orderBy = switch (sort) {
+            case "price-asc" -> "price ASC, id ASC";
+            case "price-desc" -> "price DESC, id ASC";
+            case "rating-desc" -> "rating DESC, id ASC";
+            default -> "id ASC";
+        };
+        StringBuilder json = new StringBuilder("[");
+        try (Connection connection = database();
+                PreparedStatement statement = connection.prepareStatement(
+                        "SELECT id, name, description, price, category, image, rating FROM menu_items "
+                                + "WHERE (? = '' OR category = ?) "
+                                + "AND (? = '' OR LOWER(name) LIKE ? OR LOWER(description) LIKE ?) "
+                                + "AND rating >= ? ORDER BY " + orderBy)) {
+            statement.setString(1, category);
+            statement.setString(2, category);
+            statement.setString(3, search);
+            statement.setString(4, "%" + search + "%");
+            statement.setString(5, "%" + search + "%");
+            statement.setDouble(6, minimumRating);
+            try (ResultSet result = statement.executeQuery()) {
+                boolean first = true;
+                while (result.next()) {
+                    if (!first)
+                        json.append(',');
+                    first = false;
+                    json.append(
+                            new MenuItem(result.getInt("id"), result.getString("name"), result.getString("description"),
+                                    result.getDouble("price"), result.getString("category"), result.getString("image"),
+                                    result.getDouble("rating")).json());
+                }
+            }
+        }
+        return json.append(']').toString();
+    }
+
+    /**
+     * Returns distinct menu categories in alphabetical order for the customer menu.
+     */
+    private static String menuCategoriesJson() throws SQLException {
         StringBuilder json = new StringBuilder("[");
         try (Connection connection = database();
                 Statement statement = connection.createStatement();
                 ResultSet result = statement.executeQuery(
-                        "SELECT id, name, description, price, category, image, rating FROM menu_items ORDER BY id")) {
+                        "SELECT DISTINCT category FROM menu_items WHERE category <> '' ORDER BY category")) {
             boolean first = true;
             while (result.next()) {
                 if (!first)
                     json.append(',');
                 first = false;
-                json.append(new MenuItem(result.getInt("id"), result.getString("name"), result.getString("description"),
-                        result.getDouble("price"), result.getString("category"), result.getString("image"),
-                        result.getDouble("rating")).json());
+                json.append(quote(result.getString("category")));
             }
         }
         return json.append(']').toString();
@@ -1050,7 +1233,9 @@ public final class FoodJournalServer {
 
     private static Order orderFrom(ResultSet result) throws SQLException {
         return new Order(result.getString("id"), result.getString("customer_name"), result.getString("chef_name"),
-                result.getString("status"), result.getDouble("total"), result.getString("address"));
+                result.getString("status"), result.getDouble("total"), result.getString("address"),
+                result.getString("dining_option"), result.getString("pickup_time"),
+                result.getString("payment_method"), result.getInt("estimated_minutes"));
     }
 
     private static String nextOrderId() throws SQLException {
@@ -1066,14 +1251,80 @@ public final class FoodJournalServer {
     private static void insertOrder(Order order) throws SQLException {
         try (Connection connection = database();
                 PreparedStatement statement = connection.prepareStatement(
-                        "INSERT INTO orders (id, customer_name, chef_name, status, total, address) VALUES (?, ?, ?, ?, ?, ?)")) {
+                        "INSERT INTO orders (id, customer_name, chef_name, status, total, address, dining_option, pickup_time, payment_method, estimated_minutes) "
+                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
             statement.setString(1, order.id);
             statement.setString(2, order.customerName);
             statement.setString(3, order.chefName);
             statement.setString(4, order.status);
             statement.setDouble(5, order.total);
             statement.setString(6, order.address);
+            statement.setString(7, order.diningOption);
+            statement.setString(8, order.pickupTime);
+            statement.setString(9, order.paymentMethod);
+            statement.setInt(10, order.estimatedMinutes);
             statement.executeUpdate();
+        }
+    }
+
+    /**
+     * Validates the dining selection and creates a pending restaurant-payment
+     * order.
+     */
+    private static String checkoutOrder(int userId, String body) throws Exception {
+        String diningOption = jsonString(body, "diningOption", "Pickup");
+        String pickupTime = jsonString(body, "pickupTime", "As soon as possible");
+        String tableNumber = jsonString(body, "tableNumber", "").trim();
+        String address = jsonString(body, "address", "").trim();
+        if (!diningOption.equals("Dine in") && !diningOption.equals("Pickup") && !diningOption.equals("Delivery"))
+            throw new AuthRequestException(400, "Choose Dine in, Pickup, or Delivery");
+        if (diningOption.equals("Dine in") && tableNumber.isBlank())
+            throw new AuthRequestException(400, "A table number is required for dine in");
+        if (diningOption.equals("Delivery") && address.isBlank())
+            throw new AuthRequestException(400, "A delivery address is required");
+        double total = cartTotal();
+        if (total <= 0)
+            throw new AuthRequestException(400, "Your cart is empty");
+        String destination = diningOption.equals("Dine in") ? "Table " + tableNumber
+                : diningOption.equals("Delivery") ? address : "Pickup counter";
+        Order order = new Order(nextOrderId(), customerName(userId), "Food Journal Kitchen", "Order Received", total,
+                destination, diningOption, pickupTime, "Pay at restaurant", diningOption.equals("Delivery") ? 35 : 20);
+        insertOrder(order);
+        clearCart();
+        return order.json();
+    }
+
+    /**
+     * Calculates the current cart total using the same delivery-fee rule as the
+     * cart response.
+     */
+    private static double cartTotal() throws SQLException {
+        double subtotal = 0;
+        try (Connection connection = database();
+                Statement statement = connection.createStatement();
+                ResultSet result = statement.executeQuery(
+                        "SELECT COALESCE(SUM((m.price + c.unit_adjustment) * c.quantity), 0) FROM cart_items c JOIN menu_items m ON m.id = c.menu_item_id WHERE c.customer_id = 1")) {
+            if (result.next())
+                subtotal = result.getDouble(1);
+        }
+        return subtotal == 0 ? 0 : subtotal + 3.99;
+    }
+
+    /** Clears cart rows after an order is successfully saved. */
+    private static void clearCart() throws SQLException {
+        try (Connection connection = database(); Statement statement = connection.createStatement()) {
+            statement.executeUpdate("DELETE FROM cart_items WHERE customer_id = 1");
+        }
+    }
+
+    /** Reads the authenticated customer's display name for the order receipt. */
+    private static String customerName(int userId) throws SQLException {
+        try (Connection connection = database();
+                PreparedStatement statement = connection.prepareStatement("SELECT name FROM users WHERE id = ?")) {
+            statement.setInt(1, userId);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? result.getString("name") : "Customer";
+            }
         }
     }
 
@@ -1095,20 +1346,22 @@ public final class FoodJournalServer {
         boolean first = true;
         try (Connection connection = database();
                 PreparedStatement statement = connection.prepareStatement(
-                        "SELECT m.id, m.name, m.price, c.quantity FROM cart_items c JOIN menu_items m ON m.id = c.menu_item_id "
+                        "SELECT m.id, m.name, m.price, c.quantity, c.customization, c.unit_adjustment FROM cart_items c JOIN menu_items m ON m.id = c.menu_item_id "
                                 + "WHERE c.customer_id = 1 ORDER BY m.id");
                 ResultSet result = statement.executeQuery()) {
             while (result.next()) {
                 if (!first)
                     json.append(',');
                 first = false;
-                double price = result.getDouble("price");
+                double price = result.getDouble("price") + result.getDouble("unit_adjustment");
                 int quantity = result.getInt("quantity");
                 subtotal += price * quantity;
                 json.append("{\"itemId\":").append(result.getInt("id"))
                         .append(",\"name\":").append(quote(result.getString("name")))
                         .append(",\"quantity\":").append(quantity)
-                        .append(",\"price\":").append(price).append('}');
+                        .append(",\"price\":").append(price)
+                        .append(",\"customization\":").append(quote(result.getString("customization")))
+                        .append(",\"unitAdjustment\":").append(result.getDouble("unit_adjustment")).append('}');
             }
         }
         double deliveryFee = subtotal == 0 ? 0 : 3.99;
@@ -1118,7 +1371,8 @@ public final class FoodJournalServer {
     }
 
     /** Upserts a cart item or removes it when its quantity reaches zero. */
-    private static void updateCartItem(int itemId, int quantity) throws SQLException {
+    private static void updateCartItem(int itemId, int quantity, String customization, double unitAdjustment)
+            throws SQLException {
         try (Connection connection = database()) {
             if (quantity <= 0) {
                 try (PreparedStatement statement = connection.prepareStatement(
@@ -1129,10 +1383,12 @@ public final class FoodJournalServer {
                 return;
             }
             try (PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO cart_items (customer_id, menu_item_id, quantity) VALUES (1, ?, ?) "
-                            + "ON CONFLICT(customer_id, menu_item_id) DO UPDATE SET quantity = excluded.quantity")) {
+                    "INSERT INTO cart_items (customer_id, menu_item_id, quantity, customization, unit_adjustment) VALUES (1, ?, ?, ?, ?) "
+                            + "ON CONFLICT(customer_id, menu_item_id) DO UPDATE SET quantity = excluded.quantity, customization = excluded.customization, unit_adjustment = excluded.unit_adjustment")) {
                 statement.setInt(1, itemId);
                 statement.setInt(2, quantity);
+                statement.setString(3, customization);
+                statement.setDouble(4, unitAdjustment);
                 statement.executeUpdate();
             }
         }
@@ -1154,19 +1410,22 @@ public final class FoodJournalServer {
         double subtotal = 0;
         try (Connection connection = database();
                 PreparedStatement statement = connection.prepareStatement(
-                        "SELECT m.name, m.description, m.price, c.quantity FROM cart_items c JOIN menu_items m "
+                        "SELECT m.name, m.description, m.price, c.quantity, c.customization, c.unit_adjustment FROM cart_items c JOIN menu_items m "
                                 + "ON m.id = c.menu_item_id WHERE c.customer_id = ? ORDER BY m.id")) {
             statement.setInt(1, customerId);
             try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
-                    double price = result.getDouble("price");
+                    double price = result.getDouble("price") + result.getDouble("unit_adjustment");
                     int quantity = result.getInt("quantity");
+                    String customization = result.getString("customization");
                     subtotal += price * quantity;
                     addForm(form, "line_items[" + lineIndex + "][price_data][currency]", "usd");
                     addForm(form, "line_items[" + lineIndex + "][price_data][unit_amount]",
                             String.valueOf(Math.round(price * 100)));
                     addForm(form, "line_items[" + lineIndex + "][price_data][product_data][name]",
-                            result.getString("name"));
+                            customization == null || customization.isBlank()
+                                    ? result.getString("name")
+                                    : result.getString("name") + " — " + customization);
                     addForm(form, "line_items[" + lineIndex + "][price_data][product_data][description]",
                             result.getString("description"));
                     addForm(form, "line_items[" + lineIndex + "][quantity]", String.valueOf(quantity));
@@ -1199,6 +1458,78 @@ public final class FoodJournalServer {
         if (checkoutUrl.isBlank())
             throw new IllegalStateException("Stripe returned no checkout URL");
         return "{\"url\":" + quote(checkoutUrl) + "}";
+    }
+
+    /** Creates a Stripe Checkout session for a paid membership tier. */
+    private static String createMembershipCheckoutSession(int userId, String body) throws Exception {
+        String tier = jsonString(body, "tier", "");
+        long amount = membershipAmount(tier);
+        String stripeKey = System.getenv("STRIPE_SECRET_KEY");
+        if (stripeKey == null || stripeKey.isBlank())
+            throw new IllegalStateException("STRIPE_SECRET_KEY is not configured");
+        StringBuilder form = new StringBuilder();
+        addForm(form, "mode", "payment");
+        addForm(form, "line_items[0][price_data][currency]", "usd");
+        addForm(form, "line_items[0][price_data][unit_amount]", String.valueOf(amount));
+        addForm(form, "line_items[0][price_data][product_data][name]", "Food Journal " + tier + " Membership");
+        addForm(form, "line_items[0][quantity]", "1");
+        addForm(form, "metadata[user_id]", String.valueOf(userId));
+        addForm(form, "metadata[tier]", tier);
+        addForm(form, "success_url", envOrDefault("STRIPE_MEMBERSHIP_SUCCESS_URL",
+                "http://localhost:8081/api/membership/confirm?session_id={CHECKOUT_SESSION_ID}"));
+        addForm(form, "cancel_url", envOrDefault("STRIPE_MEMBERSHIP_CANCEL_URL",
+                "http://localhost:5173/#/screen/150-membership?membership=cancelled"));
+        HttpRequest request = HttpRequest.newBuilder(URI.create("https://api.stripe.com/v1/checkout/sessions"))
+                .header("Authorization", "Bearer " + stripeKey)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString(form.toString()))
+                .build();
+        HttpResponse<String> response = HttpClient.newHttpClient().send(request,
+                HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            String message = response.statusCode() == 401 || response.statusCode() == 403
+                    ? "Stripe rejected STRIPE_SECRET_KEY. Use a valid Stripe test or live secret key"
+                    : "Stripe membership checkout is temporarily unavailable";
+            throw new AuthRequestException(502, message);
+        }
+        String checkoutUrl = jsonString(response.body(), "url", "");
+        if (checkoutUrl.isBlank())
+            throw new IllegalStateException("Stripe returned no membership checkout URL");
+        return "{\"url\":" + quote(checkoutUrl) + "}";
+    }
+
+    /** Confirms Stripe payment before activating the membership benefits. */
+    private static void confirmMembershipPayment(HttpExchange exchange) throws Exception {
+        String sessionId = queryValue(exchange.getRequestURI().getRawQuery(), "session_id");
+        String stripeKey = System.getenv("STRIPE_SECRET_KEY");
+        if (sessionId.isBlank() || stripeKey == null || stripeKey.isBlank()) {
+            sendJson(exchange, 400, "{\"error\":\"Membership payment could not be confirmed\"}");
+            return;
+        }
+        HttpRequest request = HttpRequest.newBuilder(
+                URI.create("https://api.stripe.com/v1/checkout/sessions/" + urlEncode(sessionId)))
+                .header("Authorization", "Bearer " + stripeKey).GET().build();
+        HttpResponse<String> response = HttpClient.newHttpClient().send(request,
+                HttpResponse.BodyHandlers.ofString());
+        if (!response.body().contains("\"payment_status\":\"paid\"")) {
+            sendJson(exchange, 402, "{\"error\":\"Membership payment has not completed\"}");
+            return;
+        }
+        int userId = Integer.parseInt(jsonString(response.body(), "user_id", "0"));
+        saveMembership(userId, jsonString(response.body(), "tier", ""));
+        exchange.getResponseHeaders().set("Location", envOrDefault("STRIPE_MEMBERSHIP_SUCCESS_REDIRECT",
+                "http://localhost:5173/#/screen/150-membership?membership=success"));
+        exchange.sendResponseHeaders(303, -1);
+        exchange.close();
+    }
+
+    private static long membershipAmount(String tier) throws AuthRequestException {
+        return switch (tier) {
+            case "Basic" -> 499;
+            case "Gold" -> 999;
+            case "Platinum" -> 1999;
+            default -> throw new AuthRequestException(400, "Choose Basic, Gold, or Platinum membership");
+        };
     }
 
     /**
@@ -1290,9 +1621,20 @@ public final class FoodJournalServer {
         for (String part : query.split("&")) {
             String[] pair = part.split("=", 2);
             if (pair.length == 2 && pair[0].equals(key))
-                return pair[1];
+                return URLDecoder.decode(pair[1], StandardCharsets.UTF_8);
         }
         return "";
+    }
+
+    /**
+     * Reads an optional numeric URL query parameter without failing the request.
+     */
+    private static double queryNumber(String query, String key, double fallback) {
+        try {
+            return Double.parseDouble(queryValue(query, key));
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
     }
 
     private static String envOrDefault(String key, String fallback) {

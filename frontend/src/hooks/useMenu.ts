@@ -1,5 +1,5 @@
 /*
- * Date: 19/09/2026
+ * Date: 21/09/2026
  * Name: Penglei Fan - Bella / Cole Zinda
  *
  * File Path: src/hooks/useMenu.ts
@@ -16,7 +16,15 @@ interface MenuState {
   error: string;
 }
 
-export function useMenu(): MenuState {
+export interface MenuFilters {
+  category?: string;
+  search?: string;
+  minimumRating?: number;
+  sort?: "featured" | "price-asc" | "price-desc" | "rating-desc";
+}
+
+// Loads one filtered menu result set from the API whenever a customer changes a control
+export function useMenu(filters: MenuFilters = {}): MenuState {
   const [state, setState] = useState<MenuState>({
     items: [],
     isLoading: true,
@@ -25,10 +33,20 @@ export function useMenu(): MenuState {
 
   useEffect(() => {
     let isActive = true;
+    const parameters = new URLSearchParams();
+    if (filters.category) parameters.set("category", filters.category);
+    if (filters.search?.trim()) parameters.set("q", filters.search.trim());
+    if (filters.minimumRating) {
+      parameters.set("minRating", String(filters.minimumRating));
+    }
+    if (filters.sort && filters.sort !== "featured") {
+      parameters.set("sort", filters.sort);
+    }
+    const endpoint = parameters.size ? `/menu?${parameters}` : "/menu";
 
-    // Keep the page useful while the API request is in flight
+    // Keep the page useful while the filtered API request is in flight
     api
-      .get<MenuItem[]>("/menu")
+      .get<MenuItem[]>(endpoint)
       .then((items) => {
         if (isActive) setState({ items, isLoading: false, error: "" });
       })
@@ -44,7 +62,7 @@ export function useMenu(): MenuState {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [filters.category, filters.minimumRating, filters.search, filters.sort]);
 
   return state;
 }

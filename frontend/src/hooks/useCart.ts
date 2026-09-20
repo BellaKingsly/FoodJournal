@@ -45,10 +45,20 @@ export function useCart() {
     void refresh();
   }, [refresh]);
 
-  const updateItem = async (itemId: number, quantity: number) => {
+  const updateItem = async (
+    itemId: number,
+    quantity: number,
+    customization = "",
+    unitAdjustment = 0,
+  ) => {
     setUpdatingItemId(itemId);
     try {
-      const nextCart = await api.post<Cart>("/cart", { itemId, quantity });
+      const nextCart = await api.post<Cart>("/cart", {
+        itemId,
+        quantity,
+        customization,
+        unitAdjustment,
+      });
       setCart(nextCart);
       setError("");
     } catch (requestError) {

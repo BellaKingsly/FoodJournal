@@ -16,6 +16,8 @@ import ProfileOverview from "./pages/customer/profile/ProfileOverview";
 import CustomerOrderHistory from "./pages/customer/orders/CustomerOrderHistory";
 import { AuthPage } from "./components/content/AuthPage";
 import { PaymentMethodsPage } from "./components/content/PaymentMethodsPage";
+import { MembershipPage } from "./components/content/MembershipPage";
+import { CheckoutPage } from "./components/content/CheckoutPage";
 
 export interface RegisteredView extends ViewDefinition {
   component?: ComponentType;
@@ -1175,7 +1177,7 @@ export const views: RegisteredView[] = [
     role: "customer",
     group: "home",
     kind: "settings",
-    component: PaymentMethodsPage,
+    component: CheckoutPage,
   },
   {
     id: 126,
@@ -1396,5 +1398,15 @@ export const views: RegisteredView[] = [
     role: "courier",
     group: "messages",
     kind: "messages",
+  },
+  {
+    id: 150,
+    route: "/screen/150-membership",
+    component: MembershipPage,
+    componentName: "Membership",
+    title: "Membership",
+    role: "customer",
+    group: "membership",
+    kind: "info",
   },
 ];

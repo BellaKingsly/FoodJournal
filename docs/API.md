@@ -14,16 +14,21 @@ With the backend running, open `http://localhost:8081/api/docs` in a browser to 
 | ------ | -------------------------- | -------------------------------------- |
 | GET    | /health                    | Health check                           |
 | GET    | /config                    | Application and New York configuration |
-| GET    | /menu                      | Menu list                              |
+| GET    | /menu                      | Menu list with search and filters      |
+| GET    | /menu/categories           | Available menu categories              |
 | GET    | /menu/{id}                 | Menu item                              |
 | GET    | /recipes                   | Recipe list                            |
 | GET    | /recipes/{id}              | Recipe detail                          |
 | GET    | /orders                    | Orders                                 |
 | POST   | /orders                    | Create order                           |
+| POST   | /orders/checkout           | Create pay-at-restaurant order from cart |
 | GET    | /orders/{id}               | Order detail                           |
 | PATCH  | /orders/{id}               | Update order                           |
 | POST   | /auth/login                | Sign in                                |
 | POST   | /auth/register             | Register                               |
+| GET    | /membership                | Signed-in member rewards               |
+| POST   | /membership/checkout-session | Create Stripe membership checkout    |
+| GET    | /membership/confirm        | Confirm paid membership                |
 | GET    | /profile                   | Profile                                |
 | PUT    | /profile                   | Update profile                         |
 | GET    | /messages                  | Messages                               |
@@ -61,4 +66,26 @@ With the backend running, open `http://localhost:8081/api/docs` in a browser to 
 6. `GET /payments/confirm?session_id=...` confirms the paid session, creates the order, and clears the cart.
 7. `GET /orders` returns the resulting order history.
 
+For a restaurant-payment order, the checkout page sends the dining option, pickup time, table number or delivery address to `POST /orders/checkout`. The API returns an order receipt with its identifier, total, estimated wait, and initial `Order Received` status.
+
 The backend requires `STRIPE_SECRET_KEY`. Raw card numbers and CVV values are not accepted by the application API.
+
+## Menu discovery
+
+`GET /menu` accepts optional query parameters. All filtering is performed in the API with parameterized database queries.
+
+| Parameter | Example | Purpose |
+| --- | --- | --- |
+| `category` | `Pizza` | Exact menu category |
+| `q` | `cheese` | Matches dish names and descriptions |
+| `minRating` | `4.5` | Minimum rating from 0 to 5 |
+| `sort` | `price-asc`, `price-desc`, or `rating-desc` | Sort order |
+
+## Membership payment flow
+
+1. A signed-in customer chooses a tier.
+2. `POST /membership/checkout-session` creates a Stripe-hosted Checkout session.
+3. Stripe collects card details outside this application.
+4. Stripe returns to `/membership/confirm`, which verifies the paid session and activates the tier.
+
+If Stripe rejects the secret key, the API returns a clear `502` error. Replace the placeholder or revoked key with a valid Stripe test key in `backend/.env`, restart the backend, and retry. Do not accept card number or CVV data in this API.

@@ -1,6 +1,6 @@
 /*
- * Date: 20/08/2026
- * Name: Penglei Fan - Bella
+ * Date: 20/09/2026
+ * Name: Penglei Fan - Bella / Cole Zinda
  *
  * File Path: src/components/layout/PageLayout.tsx
  * Function: Provides the shared header, navigation, and feedback area for every page
@@ -23,6 +23,7 @@ const navigationItems = [
   { label: "Orders", route: "/screen/105-customerorderhistory" },
   { label: "Recipes", route: "/screen/102-recipecomments" },
   { label: "Cart", route: "/screen/131-shoppingcart" },
+  { label: "Membership", route: "/screen/150-membership" },
   { label: "Profile", route: "/screen/096-profileoverview" },
   { label: "Settings", route: "/screen/100-profilesecurity" },
 ];
@@ -50,6 +51,7 @@ function isNavigationActive(
   if (item.label === "Orders") return view.group === "orders";
   if (item.label === "Recipes") return view.group === "recipes";
   if (item.label === "Cart") return view.kind === "cart";
+  if (item.label === "Membership") return view.group === "membership";
   if (item.label === "Profile")
     return view.route === "/screen/096-profileoverview";
   return (
@@ -145,6 +147,11 @@ export function PageLayout({
                   }
                 >
                   Personal settings
+                </button>
+                <button
+                  onClick={() => openAccountRoute("/screen/150-membership")}
+                >
+                  Membership
                 </button>
                 <button
                   onClick={() => openAccountRoute("/screen/099-profilepayment")}

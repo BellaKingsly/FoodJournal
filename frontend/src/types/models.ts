@@ -45,6 +45,8 @@ export interface CartItem {
   name: string;
   quantity: number;
   price: number;
+  customization: string;
+  unitAdjustment: number;
 }
 export interface Cart {
   items: CartItem[];
@@ -78,6 +80,12 @@ export interface RegistrationResponse {
   message: string;
   user: AuthUser;
 }
+export interface Membership {
+  tier: "Guest" | "Basic" | "Gold" | "Platinum";
+  points: number;
+  joinedAt: string | null;
+  active: boolean;
+}
 export interface Order {
   id: string;
   customerName: string;
@@ -85,5 +93,9 @@ export interface Order {
   status: string;
   total: number;
   address: string;
+  diningOption?: "Dine in" | "Pickup" | "Delivery";
+  pickupTime?: string;
+  paymentMethod?: string;
+  estimatedMinutes?: number;
   items: Array<{ name: string; quantity: number; price: number }>;
 }

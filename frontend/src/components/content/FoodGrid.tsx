@@ -5,44 +5,6 @@
  * File Path: src/components/content/FoodGrid.tsx
  * Function: Displays menu items, manages cart quantities, and starts Stripe checkout
  * 
- * * 
- * Bella, I’ll take care of the rest of the work for now. 
- * I want you to focus on your studies and exams.
- * You can get back to the other tasks when you’re on holiday. 
- * If you’d like to learn backend development, 
- * I’d be happy to teach you. For now, just focus on your exams. 
- * I’ll help the manager with anything that needs to be done, 
- * so don’t worry about work until your holidays.
- * 
- * Ok, thanks Cole
- * 
- * Bell, I just want to help you succeed and keep your job secure. I know things are a bit
- *  tough for you financially right now, and I don’t want you to end up in a difficult 
- * situation where losing your job could affect your ability to finish your studies.
-So please don’t think about quitting. You don’t need to put so much pressure on yourself. 
- I’m here to support you.
-Leave all the backend work to me, and I can help you with some of the frontend too. 
-You’re a really hardworking person, and you’ve already done so much. Let me take care of
- the remaining tasks so you can focus on preparing for your exams.
-As your friend, I genuinely want to help you in any way I can. The manager has been 
-really supportive of you as well, and I want to see you do well in both your studies and your career.
-* 
- ，Clole, Why are you so good to me? You’re a good friend of mine; 
-I don’t like taking advantage of people. There’s someone I love,
- and I don’t want to see you get hurt, because you’re a good person.
- * 
-Bella, 
- Bella, please don’t overthink things. I’m not concerned about whether you’re in love with someone or not, 
- and I don’t expect anything in return from you. We’re good friends, and I genuinely just want to see you 
- achieve everything you’ve set your heart on.
-I don’t want you to make choices that could negatively affect your future. I want to give you more time to 
-focus on yourself and your studies.
-You’re only working part-time remotely, so you’re not expected to take on all the tasks by yourself. 
-I’ll help you communicate with the manager and take care of the other things.
-Please focus on your studies for now. I really want you to have the future you’ve always wanted.
-
-If the manager asks you to work on the backend and you feel overwhelmed, just leave it all to me. 
-For now, focus on your studies. You can focus on work when you’re on holiday.
  * 
  */
 
